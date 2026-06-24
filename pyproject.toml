@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quest3-linkerhand-l10-teleop"
+version = "0.1.0"
+description = "Python-only Meta Quest 3 left-controller teleop for a LinkerHand L10 over CAN."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [
+  { name = "notalexander30" }
+]
+dependencies = [
+  "numpy",
+  "pure-python-adb",
+  "python-can"
+]
+
+[project.scripts]
+quest3-l10-teleop = "quest3_linkerhand_l10_teleop.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src/quest3_linkerhand_l10_teleop/src"]
