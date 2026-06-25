@@ -107,7 +107,8 @@ Bring up CAN:
 
 ```bash
 sudo ip link set can0 down || true
-sudo ip link set can0 type can bitrate 1000000
+sudo ip link set can0 txqueuelen 1000
+sudo ip link set can0 type can bitrate 1000000 restart-ms 100 berr-reporting on
 sudo ip link set can0 up
 ip -details link show can0
 ```
