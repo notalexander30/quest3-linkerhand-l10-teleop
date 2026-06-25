@@ -13,7 +13,7 @@ Use the left Quest controller:
 - Press `X` while teleop is enabled to toggle automatic mimic mode, where the hand repeatedly opens and closes.
 - Hold `Y` while squeezing `leftTrig` to use full-fist grab mode.
 - Pressure sensing still runs while closing. When one finger reaches the pressure threshold, that finger freezes while the other fingers keep moving.
-- Default pressure threshold is now `70`, lowered from the older `180` so soft objects like bottles are less likely to be crushed.
+- The pressure stop threshold is fixed inside the code at `70`, lowered from the older `180` so soft objects like bottles are less likely to be crushed.
 
 Default poses:
 
@@ -194,18 +194,6 @@ Put on the Quest, keep it awake, and press controller buttons. Lines should appe
 
 ## Useful Run Options
 
-Change pressure threshold:
-
-```bash
-quest3-l10-teleop --can-channel can0 --pressure-threshold 70
-```
-
-For very soft objects, try lower:
-
-```bash
-quest3-l10-teleop --can-channel can0 --pressure-threshold 50
-```
-
 Use right hand:
 
 ```bash
@@ -238,6 +226,14 @@ Change mimic cycle speed:
 
 ```bash
 quest3-l10-teleop --can-channel can0 --mimic-period-s 4.0
+```
+
+Tune pressure threshold inside code:
+
+Edit `PRESSURE_STOP_THRESHOLD` in `src/quest3_linkerhand_l10_teleop/src/quest3_linkerhand_l10_teleop/cli.py`, then reinstall:
+
+```bash
+python -m pip install -e .
 ```
 
 Optional speed/torque:

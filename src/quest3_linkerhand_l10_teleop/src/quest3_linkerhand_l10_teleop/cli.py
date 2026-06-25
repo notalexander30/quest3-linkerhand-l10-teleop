@@ -23,6 +23,7 @@ from .teleop_core import (
 DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 DEFAULT_CLOSED = [80, 255, 80, 80, 80, 80, 255, 255, 255, 255]
 DEFAULT_FIST = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
+PRESSURE_STOP_THRESHOLD = 70.0
 
 
 def parse_byte_list(raw: Optional[str], expected_lengths: Iterable[int], name: str) -> Optional[List[int]]:
@@ -53,6 +54,7 @@ class Quest3L10Teleop:
         self.open_pose = parse_pose(args.open_position, DEFAULT_OPEN, "--open-position")
         self.closed_pose = parse_pose(args.closed_position, DEFAULT_CLOSED, "--closed-position")
         self.fist_pose = parse_pose(args.fist_position, DEFAULT_FIST, "--fist-position")
+        self.pressure_threshold = PRESSURE_STOP_THRESHOLD
         self.current_pose = list(self.open_pose)
         self.frozen_fingers = [False] * 5
         self.prev_enabled = False
@@ -87,6 +89,7 @@ class Quest3L10Teleop:
             self.args.mimic_button,
             self.args.fist_mode_button,
         )
+        logging.info("Pressure finger-freeze threshold is fixed in code at %.1f.", self.pressure_threshold)
 
         self.hand = L10CanHand(
             hand_type=self.hand_type,
@@ -223,14 +226,14 @@ class Quest3L10Teleop:
         crossing = [
             index
             for index, pressure in enumerate(self.latest_pressures)
-            if not self.frozen_fingers[index] and pressure >= self.args.pressure_threshold
+            if not self.frozen_fingers[index] and pressure >= self.pressure_threshold
         ]
         measured = self.hand.get_joint_status(wait_s=0.01) if crossing else None
         next_pose, next_frozen = freeze_fingers_from_pressure(
             self.current_pose,
             self.frozen_fingers,
             self.latest_pressures,
-            self.args.pressure_threshold,
+            self.pressure_threshold,
             measured_position=measured,
         )
         for index in crossing:
@@ -238,7 +241,7 @@ class Quest3L10Teleop:
                 "Freezing %s at pressure %.1f >= %.1f",
                 FINGER_NAMES[index],
                 self.latest_pressures[index],
-                self.args.pressure_threshold,
+                self.pressure_threshold,
             )
         self.current_pose = next_pose
         self.frozen_fingers = next_frozen
@@ -270,7 +273,6 @@ def build_parser():
     parser.add_argument("--mimic-button", default="X", help="Press this button to toggle automatic open-close mimic mode.")
     parser.add_argument("--fist-mode-button", default="Y", help="Hold this button for full-fist close mode.")
     parser.add_argument("--button-threshold", type=float, default=0.15)
-    parser.add_argument("--pressure-threshold", type=float, default=70.0)
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
