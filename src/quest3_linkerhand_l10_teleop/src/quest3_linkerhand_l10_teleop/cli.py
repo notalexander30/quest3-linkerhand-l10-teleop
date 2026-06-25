@@ -21,8 +21,8 @@ from .teleop_core import (
 
 
 DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
-DEFAULT_CLOSED = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
-DEFAULT_PICKUP = [0, 255, 0, 80, 255, 255, 255, 255, 255, 255]
+DEFAULT_CLOSED = [80, 255, 80, 80, 80, 80, 255, 255, 255, 255]
+DEFAULT_FIST = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
 
 
 def parse_byte_list(raw: Optional[str], expected_lengths: Iterable[int], name: str) -> Optional[List[int]]:
@@ -52,10 +52,13 @@ class Quest3L10Teleop:
 
         self.open_pose = parse_pose(args.open_position, DEFAULT_OPEN, "--open-position")
         self.closed_pose = parse_pose(args.closed_position, DEFAULT_CLOSED, "--closed-position")
-        self.pickup_pose = parse_pose(args.pickup_position, DEFAULT_PICKUP, "--pickup-position")
+        self.fist_pose = parse_pose(args.fist_position, DEFAULT_FIST, "--fist-position")
         self.current_pose = list(self.open_pose)
         self.frozen_fingers = [False] * 5
         self.prev_enabled = False
+        self.prev_mimic_pressed = False
+        self.mimic_enabled = False
+        self.mimic_started_at = 0.0
         self.last_close_amount = 0.0
         self.last_mode = "normal"
         self.last_sent = None
@@ -80,8 +83,9 @@ class Quest3L10Teleop:
             self.args.close_axis,
         )
         logging.info(
-            "Hold %s for pickup mode; release it for normal bend-only grip mode.",
-            self.args.pickup_mode_button,
+            "Press %s to toggle mimic open-close; hold %s for full-fist mode.",
+            self.args.mimic_button,
+            self.args.fist_mode_button,
         )
 
         self.hand = L10CanHand(
@@ -145,20 +149,32 @@ class Quest3L10Teleop:
             return
 
         enabled = button_is_pressed(buttons, self.args.teleop_button, self.args.button_threshold)
-        close_amount = button_value(buttons, self.args.close_axis)
-        pickup_mode = button_is_pressed(buttons, self.args.pickup_mode_button, self.args.button_threshold)
-        mode = "pickup" if pickup_mode else "normal"
+        trigger_close_amount = button_value(buttons, self.args.close_axis)
+        fist_mode = button_is_pressed(buttons, self.args.fist_mode_button, self.args.button_threshold)
+        mimic_pressed = button_is_pressed(buttons, self.args.mimic_button, self.args.button_threshold)
+        now = time.monotonic()
 
         if not enabled:
             if self.prev_enabled:
                 logging.info("Teleop disabled; holding last LinkerHand command.")
             self.prev_enabled = False
+            self.prev_mimic_pressed = mimic_pressed
+            self.mimic_enabled = False
             return
 
         if not self.prev_enabled:
             logging.info("Teleop enabled.")
         self.prev_enabled = True
 
+        if mimic_pressed and not self.prev_mimic_pressed:
+            self.mimic_enabled = not self.mimic_enabled
+            self.mimic_started_at = now
+            self.frozen_fingers = [False] * 5
+            logging.info("Mimic open-close %s; pressure freezes cleared.", "enabled" if self.mimic_enabled else "disabled")
+        self.prev_mimic_pressed = mimic_pressed
+
+        close_amount = self.mimic_close_amount(now) if self.mimic_enabled else trigger_close_amount
+        mode = "fist" if fist_mode else "normal"
         if mode != self.last_mode:
             self.frozen_fingers = [False] * 5
             logging.info("%s grip mode selected; pressure freezes cleared.", mode.capitalize())
@@ -174,7 +190,7 @@ class Quest3L10Teleop:
             self.poll_pressures_if_due()
             self.apply_pressure_freeze()
 
-        close_pose = self.pickup_pose if pickup_mode else self.closed_pose
+        close_pose = self.fist_pose if fist_mode else self.closed_pose
         target = interpolate_pose(self.open_pose, close_pose, close_amount)
 
         self.current_pose = move_pose_toward(
@@ -185,6 +201,13 @@ class Quest3L10Teleop:
         )
         self.last_close_amount = close_amount
         self.send_if_changed(self.current_pose)
+
+    def mimic_close_amount(self, now):
+        period = max(self.args.mimic_period_s, 0.5)
+        phase = ((now - self.mimic_started_at) % period) / period
+        if phase < 0.5:
+            return phase * 2.0
+        return (1.0 - phase) * 2.0
 
     def poll_pressures_if_due(self):
         now = time.monotonic()
@@ -244,16 +267,18 @@ def build_parser():
     parser.add_argument("--apk-path", default="", help="Path to teleop-debug.apk if not already installed.")
     parser.add_argument("--teleop-button", default="leftGrip", help="Hold this Quest input to enable teleop.")
     parser.add_argument("--close-axis", default="leftTrig", help="Analog Quest input used for open/close.")
-    parser.add_argument("--pickup-mode-button", default="Y", help="Hold this button for pickup/pinch mode.")
+    parser.add_argument("--mimic-button", default="X", help="Press this button to toggle automatic open-close mimic mode.")
+    parser.add_argument("--fist-mode-button", default="Y", help="Hold this button for full-fist close mode.")
     parser.add_argument("--button-threshold", type=float, default=0.15)
-    parser.add_argument("--pressure-threshold", type=float, default=180.0)
+    parser.add_argument("--pressure-threshold", type=float, default=70.0)
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
     parser.add_argument("--trigger-deadband", type=float, default=0.03)
+    parser.add_argument("--mimic-period-s", type=float, default=3.0)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--closed-position", default="", help="10 comma-separated 0..255 joint values.")
-    parser.add_argument("--pickup-position", default="", help="10 comma-separated pickup/pinch joint values.")
+    parser.add_argument("--fist-position", default="", help="10 comma-separated full-fist joint values.")
     parser.add_argument("--speed", default="", help="Optional 5 or 10 comma-separated speed values.")
     parser.add_argument("--torque", default="", help="Optional 5 or 10 comma-separated torque values.")
     parser.add_argument("--no-open-on-start", dest="open_on_start", action="store_false")

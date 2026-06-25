@@ -10,16 +10,18 @@ Use the left Quest controller:
 - Release `leftGrip` to stop sending new hand commands.
 - Squeeze the left index/top trigger, `leftTrig`, to close the hand proportionally.
 - Release `leftTrig` to open the hand proportionally.
-- Hold `Y` while squeezing `leftTrig` to use pickup/pinch mode.
+- Press `X` while teleop is enabled to toggle automatic mimic mode, where the hand repeatedly opens and closes.
+- Hold `Y` while squeezing `leftTrig` to use full-fist grab mode.
 - Pressure sensing still runs while closing. When one finger reaches the pressure threshold, that finger freezes while the other fingers keep moving.
+- Default pressure threshold is now `70`, lowered from the older `180` so soft objects like bottles are less likely to be crushed.
 
 Default poses:
 
 - Open pose: `255,255,255,255,255,255,255,255,255,255`
-- Normal close pose: `0,255,0,0,0,0,255,255,255,255`
-- Pickup/pinch close pose: `0,255,0,80,255,255,255,255,255,255`
+- Normal soft close pose: `80,255,80,80,80,80,255,255,255,255`
+- Full-fist close pose: `0,255,0,0,0,0,255,255,255,255`
 
-The close poses avoid side/rotation motions by keeping those joints at `255`.
+The close poses avoid side/rotation motions by keeping those joints at `255`. Normal mode is intentionally gentler; use `Y` full-fist mode when you need a stronger grab.
 
 The left L10 CAN ID is `0x28`. Right hand mode is available with `--hand-type right`, using CAN ID `0x27`.
 
@@ -79,6 +81,26 @@ python -m pip install --upgrade pip
 python -m pip install -e .
 ```
 
+## Newly Booted Computer Quick Start
+
+Run this after the computer has restarted and the hand/Quest cables are connected:
+
+```bash
+cd ~/quest3-linkerhand-l10-teleop
+git pull
+source .venv/bin/activate
+python -m pip install -e .
+
+adb devices
+
+sudo ip link set can0 down || true
+sudo ip link set can0 txqueuelen 1000
+sudo ip link set can0 type can bitrate 1000000 restart-ms 100 berr-reporting on
+sudo ip link set can0 up
+
+quest3-l10-teleop --can-channel can0
+```
+
 ## Terminal 1: Main Teleop
 
 Bring up CAN:
@@ -109,8 +131,19 @@ Expected startup output:
 ```text
 Starting Quest3 -> left LinkerHand L10 teleop on can0
 Hold leftGrip to enable teleop; use leftTrig as the analog open/close trigger.
-Hold Y for pickup mode; release it for normal bend-only grip mode.
+Press X to toggle mimic open-close; hold Y for full-fist mode.
 Sent startup open pose: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+```
+
+Default operation:
+
+```text
+Hold leftGrip       = teleop ON
+Release leftGrip    = teleop OFF
+Squeeze leftTrig    = soft close proportional to trigger amount
+Release leftTrig    = open proportional to trigger amount
+Press X             = toggle mimic automatic open-close while leftGrip is held
+Hold Y + leftTrig   = full-fist grab mode
 ```
 
 ## Terminal 2: Quest Debug
@@ -163,7 +196,13 @@ Put on the Quest, keep it awake, and press controller buttons. Lines should appe
 Change pressure threshold:
 
 ```bash
-quest3-l10-teleop --can-channel can0 --pressure-threshold 170
+quest3-l10-teleop --can-channel can0 --pressure-threshold 70
+```
+
+For very soft objects, try lower:
+
+```bash
+quest3-l10-teleop --can-channel can0 --pressure-threshold 50
 ```
 
 Use right hand:
@@ -190,8 +229,14 @@ Override poses:
 quest3-l10-teleop \
   --can-channel can0 \
   --open-position 255,255,255,255,255,255,255,255,255,255 \
-  --closed-position 0,255,0,0,0,0,255,255,255,255 \
-  --pickup-position 0,255,0,80,255,255,255,255,255,255
+  --closed-position 80,255,80,80,80,80,255,255,255,255 \
+  --fist-position 0,255,0,0,0,0,255,255,255,255
+```
+
+Change mimic cycle speed:
+
+```bash
+quest3-l10-teleop --can-channel can0 --mimic-period-s 4.0
 ```
 
 Optional speed/torque:
