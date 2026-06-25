@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "quest3-linkerhand-l10-teleop"
-version = "0.3.1"
+version = "0.3.2"
 description = "Python-only Meta Quest 3 left-controller teleop for a LinkerHand L10 over CAN."
 readme = "README.md"
 requires-python = ">=3.8"
