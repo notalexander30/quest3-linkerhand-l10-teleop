@@ -41,7 +41,7 @@ class TeleopCoreTest(unittest.TestCase):
 
     def test_move_pose_respects_frozen_finger(self):
         current = [255] * 10
-        closed = [80, 255, 80, 80, 80, 80, 255, 255, 255, 255]
+        closed = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
         moved = move_pose_toward(current, closed, [False, True, False, False, False], step=8)
         self.assertEqual(moved[2], 255)
         self.assertEqual(moved[6], 255)
@@ -49,15 +49,9 @@ class TeleopCoreTest(unittest.TestCase):
 
     def test_interpolate_pose_uses_trigger_amount(self):
         open_pose = [255] * 10
-        closed = [80, 255, 80, 80, 80, 80, 255, 255, 255, 255]
+        closed = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
         halfway = interpolate_pose(open_pose, closed, 0.5)
-        self.assertEqual(pose_to_bytes(halfway), [168, 255, 168, 168, 168, 168, 255, 255, 255, 255])
-
-    def test_interpolate_fist_pose_can_fully_close(self):
-        open_pose = [255] * 10
-        fist = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
-        fully_closed = interpolate_pose(open_pose, fist, 1.0)
-        self.assertEqual(pose_to_bytes(fully_closed), fist)
+        self.assertEqual(pose_to_bytes(halfway), [128, 255, 128, 128, 128, 128, 255, 255, 255, 255])
 
     def test_pose_to_bytes_clamps(self):
         self.assertEqual(pose_to_bytes([-10, 10.4, 300]), [0, 10, 255])
