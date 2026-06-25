@@ -12,16 +12,17 @@ from .oculus_reader import OculusReader
 from .teleop_core import (
     FINGER_NAMES,
     button_is_pressed,
+    button_value,
     freeze_fingers_from_pressure,
+    interpolate_pose,
     move_pose_toward,
     pose_to_bytes,
 )
 
 
-DEFAULT_LEFT_OPEN = [255, 205, 255, 255, 255, 255, 180, 179, 181, 41]
-DEFAULT_LEFT_CLOSED = [116, 208, 0, 0, 0, 0, 255, 255, 255, 0]
-DEFAULT_RIGHT_OPEN = [255, 104, 255, 255, 255, 255, 255, 255, 255, 71]
-DEFAULT_RIGHT_CLOSED = [101, 60, 0, 0, 0, 0, 255, 255, 255, 51]
+DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
+DEFAULT_CLOSED = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
+DEFAULT_PICKUP = [0, 255, 0, 80, 255, 255, 255, 255, 255, 255]
 
 
 def parse_byte_list(raw: Optional[str], expected_lengths: Iterable[int], name: str) -> Optional[List[int]]:
@@ -48,20 +49,15 @@ class Quest3L10Teleop:
     def __init__(self, args):
         self.args = args
         self.hand_type = args.hand_type.lower()
-        if self.hand_type == "left":
-            default_open = DEFAULT_LEFT_OPEN
-            default_closed = DEFAULT_LEFT_CLOSED
-        else:
-            default_open = DEFAULT_RIGHT_OPEN
-            default_closed = DEFAULT_RIGHT_CLOSED
 
-        self.open_pose = parse_pose(args.open_position, default_open, "--open-position")
-        self.closed_pose = parse_pose(args.closed_position, default_closed, "--closed-position")
+        self.open_pose = parse_pose(args.open_position, DEFAULT_OPEN, "--open-position")
+        self.closed_pose = parse_pose(args.closed_position, DEFAULT_CLOSED, "--closed-position")
+        self.pickup_pose = parse_pose(args.pickup_position, DEFAULT_PICKUP, "--pickup-position")
         self.current_pose = list(self.open_pose)
-        self.target_closed = False
         self.frozen_fingers = [False] * 5
-        self.prev_toggle_pressed = False
         self.prev_enabled = False
+        self.last_close_amount = 0.0
+        self.last_mode = "normal"
         self.last_sent = None
         self.latest_pressures = [0.0] * 5
         self.last_force_poll = 0.0
@@ -79,9 +75,13 @@ class Quest3L10Teleop:
             self.args.bitrate,
         )
         logging.info(
-            "Hold %s to enable teleop; press %s while enabled to toggle open/close.",
+            "Hold %s to enable teleop; use %s as the analog open/close trigger.",
             self.args.teleop_button,
-            self.args.open_close_button,
+            self.args.close_axis,
+        )
+        logging.info(
+            "Hold %s for pickup mode; release it for normal bend-only grip mode.",
+            self.args.pickup_mode_button,
         )
 
         self.hand = L10CanHand(
@@ -98,10 +98,15 @@ class Quest3L10Teleop:
         if torque:
             self.hand.set_torque(torque)
 
-        measured = self.hand.get_joint_status(wait_s=0.03)
-        if measured:
-            self.current_pose = [float(value) for value in measured]
-            logging.info("Initialized from current L10 joint status: %s", measured)
+        if self.args.open_on_start:
+            self.hand.set_joint_positions(pose_to_bytes(self.open_pose))
+            self.last_sent = pose_to_bytes(self.open_pose)
+            logging.info("Sent startup open pose: %s", self.last_sent)
+        else:
+            measured = self.hand.get_joint_status(wait_s=0.03)
+            if measured:
+                self.current_pose = [float(value) for value in measured]
+                logging.info("Initialized from current L10 joint status: %s", measured)
 
         self.reader = OculusReader(
             ip_address=self.args.quest_ip or None,
@@ -140,35 +145,37 @@ class Quest3L10Teleop:
             return
 
         enabled = button_is_pressed(buttons, self.args.teleop_button, self.args.button_threshold)
-        toggle_pressed = button_is_pressed(buttons, self.args.open_close_button, self.args.button_threshold)
+        close_amount = button_value(buttons, self.args.close_axis)
+        pickup_mode = button_is_pressed(buttons, self.args.pickup_mode_button, self.args.button_threshold)
+        mode = "pickup" if pickup_mode else "normal"
 
         if not enabled:
             if self.prev_enabled:
                 logging.info("Teleop disabled; holding last LinkerHand command.")
             self.prev_enabled = False
-            self.prev_toggle_pressed = toggle_pressed
             return
 
         if not self.prev_enabled:
             logging.info("Teleop enabled.")
         self.prev_enabled = True
 
-        if toggle_pressed and not self.prev_toggle_pressed:
-            self.target_closed = not self.target_closed
-            if self.target_closed:
-                logging.info("Close target selected.")
-            else:
-                self.frozen_fingers = [False] * 5
-                logging.info("Open target selected; pressure freezes cleared.")
-        self.prev_toggle_pressed = toggle_pressed
+        if mode != self.last_mode:
+            self.frozen_fingers = [False] * 5
+            logging.info("%s grip mode selected; pressure freezes cleared.", mode.capitalize())
+            self.last_mode = mode
 
-        if self.target_closed:
+        is_opening = close_amount < (self.last_close_amount - self.args.trigger_deadband)
+        if close_amount <= self.args.trigger_deadband or is_opening:
+            if any(self.frozen_fingers):
+                logging.info("Opening trigger detected; pressure freezes cleared.")
+            self.frozen_fingers = [False] * 5
+
+        if close_amount > self.args.trigger_deadband:
             self.poll_pressures_if_due()
             self.apply_pressure_freeze()
-            target = self.closed_pose
-        else:
-            self.frozen_fingers = [False] * 5
-            target = self.open_pose
+
+        close_pose = self.pickup_pose if pickup_mode else self.closed_pose
+        target = interpolate_pose(self.open_pose, close_pose, close_amount)
 
         self.current_pose = move_pose_toward(
             self.current_pose,
@@ -176,6 +183,7 @@ class Quest3L10Teleop:
             self.frozen_fingers,
             self.args.step_per_cycle,
         )
+        self.last_close_amount = close_amount
         self.send_if_changed(self.current_pose)
 
     def poll_pressures_if_due(self):
@@ -234,17 +242,22 @@ def build_parser():
     parser.add_argument("--hand-type", choices=["left", "right"], default="left")
     parser.add_argument("--quest-ip", default="", help="Quest IP for Wi-Fi ADB mode. Omit for USB.")
     parser.add_argument("--apk-path", default="", help="Path to teleop-debug.apk if not already installed.")
-    parser.add_argument("--teleop-button", default="X", help="Hold this Quest button to enable teleop.")
-    parser.add_argument("--open-close-button", default="Y", help="Press this button to toggle open/close.")
-    parser.add_argument("--button-threshold", type=float, default=0.55)
+    parser.add_argument("--teleop-button", default="leftGrip", help="Hold this Quest input to enable teleop.")
+    parser.add_argument("--close-axis", default="leftTrig", help="Analog Quest input used for open/close.")
+    parser.add_argument("--pickup-mode-button", default="Y", help="Hold this button for pickup/pinch mode.")
+    parser.add_argument("--button-threshold", type=float, default=0.15)
     parser.add_argument("--pressure-threshold", type=float, default=180.0)
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
+    parser.add_argument("--trigger-deadband", type=float, default=0.03)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--closed-position", default="", help="10 comma-separated 0..255 joint values.")
+    parser.add_argument("--pickup-position", default="", help="10 comma-separated pickup/pinch joint values.")
     parser.add_argument("--speed", default="", help="Optional 5 or 10 comma-separated speed values.")
     parser.add_argument("--torque", default="", help="Optional 5 or 10 comma-separated torque values.")
+    parser.add_argument("--no-open-on-start", dest="open_on_start", action="store_false")
+    parser.set_defaults(open_on_start=True)
     parser.add_argument("--print-quest-fps", action="store_true")
     parser.add_argument("--debug", action="store_true")
     return parser

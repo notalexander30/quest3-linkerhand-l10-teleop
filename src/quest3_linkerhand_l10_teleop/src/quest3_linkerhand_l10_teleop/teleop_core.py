@@ -16,14 +16,26 @@ def clamp_byte(value) -> int:
 
 
 def button_is_pressed(buttons: Dict, name: str, analog_threshold: float = 0.55) -> bool:
+    return button_value(buttons, name) >= analog_threshold
+
+
+def button_value(buttons: Dict, name: str) -> float:
     value = buttons.get(name)
     if isinstance(value, bool):
-        return value
+        return 1.0 if value else 0.0
     if isinstance(value, (int, float)):
-        return float(value) >= analog_threshold
+        return max(0.0, min(1.0, float(value)))
     if isinstance(value, (tuple, list)) and value:
-        return float(value[0]) >= analog_threshold
-    return False
+        return max(0.0, min(1.0, float(value[0])))
+    return 0.0
+
+
+def interpolate_pose(open_pose: Sequence[float], closed_pose: Sequence[float], close_amount: float) -> List[float]:
+    close_amount = max(0.0, min(1.0, float(close_amount)))
+    return [
+        float(open_value) + (float(closed_value) - float(open_value)) * close_amount
+        for open_value, closed_value in zip(open_pose, closed_pose)
+    ]
 
 
 def move_scalar_toward(current: float, target: float, step: float) -> float:
