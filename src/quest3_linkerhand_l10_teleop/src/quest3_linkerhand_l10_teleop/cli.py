@@ -61,15 +61,11 @@ class Quest3L10Teleop:
         )
         self.pickup_pose = parse_pose(args.pickup_position, DEFAULT_PICKUP, "--pickup-position")
         self.current_pose = list(self.open_pose)
-        self.normal_joint_steps = build_joint_steps(
+        self.joint_steps = build_joint_steps(
             args.step_per_cycle,
             thumb_pitch_scale=args.thumb_pitch_speed_scale,
         )
-        self.pickup_joint_steps = build_joint_steps(
-            args.step_per_cycle,
-            thumb_pitch_scale=args.pickup_thumb_pitch_speed_scale,
-        )
-        self.pickup_mode_until = 0.0
+        self.pickup_mode_enabled = False
         self.prev_pickup_button_pressed = False
         self.frozen_fingers = [False] * 5
         self.prev_enabled = False
@@ -97,9 +93,8 @@ class Quest3L10Teleop:
             self.args.close_axis,
         )
         logging.info(
-            "Press %s to enter pickup mode for %.1f seconds.",
+            "Press %s to toggle pickup mode; press it again for normal bend-only grip mode.",
             self.args.pickup_mode_button,
-            self.args.pickup_mode_duration_s,
         )
 
         self.hand = L10CanHand(
@@ -162,7 +157,6 @@ class Quest3L10Teleop:
                 self.last_waiting_log = now
             return
 
-        now = time.monotonic()
         enabled = button_is_pressed(buttons, self.args.teleop_button, self.args.button_threshold)
         close_amount = button_value(buttons, self.args.close_axis)
         pickup_button_pressed = button_is_pressed(
@@ -171,15 +165,14 @@ class Quest3L10Teleop:
             self.args.button_threshold,
         )
         if pickup_button_pressed and not self.prev_pickup_button_pressed:
-            self.pickup_mode_until = now + max(0.0, self.args.pickup_mode_duration_s)
+            self.pickup_mode_enabled = not self.pickup_mode_enabled
             logging.info(
-                "Pickup grip mode selected for %.1f seconds.",
-                self.args.pickup_mode_duration_s,
+                "%s grip mode selected.",
+                "Pickup" if self.pickup_mode_enabled else "Normal",
             )
         self.prev_pickup_button_pressed = pickup_button_pressed
 
-        pickup_mode = now < self.pickup_mode_until
-        mode = "pickup" if pickup_mode else "normal"
+        mode = "pickup" if self.pickup_mode_enabled else "normal"
 
         if not enabled:
             if self.prev_enabled:
@@ -206,16 +199,15 @@ class Quest3L10Teleop:
             self.poll_pressures_if_due()
             self.apply_pressure_freeze()
 
-        open_pose = self.pickup_open_pose if pickup_mode else self.open_pose
-        close_pose = self.pickup_pose if pickup_mode else self.closed_pose
-        joint_steps = self.pickup_joint_steps if pickup_mode else self.normal_joint_steps
+        open_pose = self.pickup_open_pose if self.pickup_mode_enabled else self.open_pose
+        close_pose = self.pickup_pose if self.pickup_mode_enabled else self.closed_pose
         target = interpolate_pose(open_pose, close_pose, close_amount)
 
         self.current_pose = move_pose_toward(
             self.current_pose,
             target,
             self.frozen_fingers,
-            joint_steps,
+            self.joint_steps,
         )
         self.last_close_amount = close_amount
         self.send_if_changed(self.current_pose)
@@ -284,9 +276,7 @@ def build_parser():
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
-    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.8)
-    parser.add_argument("--pickup-thumb-pitch-speed-scale", type=float, default=1.0)
-    parser.add_argument("--pickup-mode-duration-s", type=float, default=1.0)
+    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.75)
     parser.add_argument("--trigger-deadband", type=float, default=0.03)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--closed-position", default="", help="10 comma-separated 0..255 joint values.")

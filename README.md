@@ -10,9 +10,9 @@ Use the left Quest controller:
 - Release `leftGrip` to stop sending new hand commands.
 - Squeeze the left index/top trigger, `leftTrig`, to close the hand proportionally.
 - Release `leftTrig` to open the hand proportionally.
-- Press `Y` once to enter pickup/pinch mode for 1 second, then it automatically returns to normal bend-only mode.
+- Press `Y` once to enter pickup/pinch mode. Press `Y` again to return to normal bend-only mode.
 - Pressure sensing still runs while closing. When one finger reaches the pressure threshold, that finger freezes while the other fingers keep moving.
-- In normal mode, thumb pitch joint index `1` moves at 80% of the normal software step speed by default.
+- Thumb pitch joint index `1` moves at 75% of the normal software step speed by default.
 
 Default poses:
 
@@ -111,7 +111,7 @@ Expected startup output:
 ```text
 Starting Quest3 -> left LinkerHand L10 teleop on can0
 Hold leftGrip to enable teleop; use leftTrig as the analog open/close trigger.
-Press Y to enter pickup mode for 1.0 seconds.
+Press Y to toggle pickup mode; press it again for normal bend-only grip mode.
 Sent startup open pose: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 ```
 
@@ -192,12 +192,6 @@ Use a different pickup mode button:
 quest3-l10-teleop --can-channel can0 --pickup-mode-button X
 ```
 
-Change how long pickup mode stays active after pressing the pickup button:
-
-```bash
-quest3-l10-teleop --can-channel can0 --pickup-mode-duration-s 1.0
-```
-
 Override poses:
 
 ```bash
@@ -214,8 +208,7 @@ Optional speed/torque:
 ```bash
 quest3-l10-teleop --can-channel can0 --speed 120,120,120,120,120
 quest3-l10-teleop --can-channel can0 --torque 180,180,180,180,180
-quest3-l10-teleop --can-channel can0 --thumb-pitch-speed-scale 0.8
-quest3-l10-teleop --can-channel can0 --pickup-thumb-pitch-speed-scale 1.0
+quest3-l10-teleop --can-channel can0 --thumb-pitch-speed-scale 0.75
 ```
 
 Disable startup open command:

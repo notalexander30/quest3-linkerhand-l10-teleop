@@ -65,28 +65,31 @@ class CliTest(unittest.TestCase):
         teleop.hand = FakeHand()
         return teleop
 
-    def test_default_pickup_is_y_for_one_second(self):
+    def test_default_pickup_is_y_toggle(self):
         args = self.cli.build_parser().parse_args([])
         teleop = self.make_teleop({})
 
         self.assertEqual(args.pickup_mode_button, "Y")
-        self.assertEqual(args.pickup_mode_duration_s, 1.0)
-        self.assertEqual(args.thumb_pitch_speed_scale, 0.8)
-        self.assertEqual(args.pickup_thumb_pitch_speed_scale, 1.0)
-        self.assertAlmostEqual(teleop.normal_joint_steps[1], 6.4)
-        self.assertAlmostEqual(teleop.pickup_joint_steps[1], 8.0)
+        self.assertEqual(args.thumb_pitch_speed_scale, 0.75)
+        self.assertAlmostEqual(teleop.joint_steps[1], 6.0)
 
-    def test_pickup_mode_expires_back_to_normal(self):
+    def test_pickup_mode_toggles_until_y_pressed_again(self):
         teleop = self.make_teleop({"leftGrip": (1.0,), "leftTrig": (0.0,), "Y": True})
 
         teleop.step()
         self.assertEqual(teleop.last_mode, "pickup")
-        self.assertEqual(teleop.pickup_mode_until, 11.0)
+        self.assertTrue(teleop.pickup_mode_enabled)
 
         self.now = 11.1
         teleop.reader.buttons = {"leftGrip": (1.0,), "leftTrig": (0.0,), "Y": False}
         teleop.step()
+        self.assertEqual(teleop.last_mode, "pickup")
+        self.assertTrue(teleop.pickup_mode_enabled)
+
+        teleop.reader.buttons = {"leftGrip": (1.0,), "leftTrig": (0.0,), "Y": True}
+        teleop.step()
         self.assertEqual(teleop.last_mode, "normal")
+        self.assertFalse(teleop.pickup_mode_enabled)
 
 
 if __name__ == "__main__":
