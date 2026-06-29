@@ -11,14 +11,14 @@ Use the left Quest controller:
 - Squeeze the left index/top trigger, `leftTrig`, to close the hand proportionally.
 - Release `leftTrig` to open the hand proportionally.
 - Press `Y` once to enter pickup/pinch mode. Press `Y` again to return to normal bend-only mode.
-- Pressure sensing still runs while closing. When one finger reaches the pressure threshold, that finger freezes while the other fingers keep moving.
-- Thumb pitch joint index `1` moves at 75% of the normal software step speed by default.
+- Pressure sensing still runs while closing. All 15 tactile pressure sensors use the same pressure threshold; when any sensor on a finger reaches it, that finger freezes while the other fingers keep moving.
+- Thumb pitch joint index `0` moves at 50% of the normal software step speed by default. Thumb abduction joint index `1` is not moved by the pickup open pose.
 
 Default poses:
 
 - Open pose: `255,255,255,255,255,255,255,255,255,255`
 - Normal close pose: `0,255,0,0,0,0,255,255,255,255`
-- Pickup/pinch open pose: `255,0,255,255,255,255,255,255,255,255`
+- Pickup/pinch open pose: `255,255,255,255,255,255,255,255,255,255`
 - Pickup/pinch close pose: `0,255,0,0,0,0,255,255,255,255`
 
 The close poses avoid side/rotation motions by keeping those joints at `255`.
@@ -199,7 +199,7 @@ quest3-l10-teleop \
   --can-channel can0 \
   --open-position 255,255,255,255,255,255,255,255,255,255 \
   --closed-position 0,255,0,0,0,0,255,255,255,255 \
-  --pickup-open-position 255,0,255,255,255,255,255,255,255,255 \
+  --pickup-open-position 255,255,255,255,255,255,255,255,255,255 \
   --pickup-position 0,255,0,0,0,0,255,255,255,255
 ```
 
@@ -208,7 +208,7 @@ Optional speed/torque:
 ```bash
 quest3-l10-teleop --can-channel can0 --speed 120,120,120,120,120
 quest3-l10-teleop --can-channel can0 --torque 180,180,180,180,180
-quest3-l10-teleop --can-channel can0 --thumb-pitch-speed-scale 0.75
+quest3-l10-teleop --can-channel can0 --thumb-pitch-speed-scale 0.5
 ```
 
 Disable startup open command:

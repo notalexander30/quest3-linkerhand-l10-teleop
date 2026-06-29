@@ -23,7 +23,7 @@ from .teleop_core import (
 
 DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 DEFAULT_CLOSED = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
-DEFAULT_PICKUP_OPEN = [255, 0, 255, 255, 255, 255, 255, 255, 255, 255]
+DEFAULT_PICKUP_OPEN = list(DEFAULT_OPEN)
 DEFAULT_PICKUP = list(DEFAULT_CLOSED)
 
 
@@ -270,13 +270,13 @@ def build_parser():
     parser.add_argument("--apk-path", default="", help="Path to teleop-debug.apk if not already installed.")
     parser.add_argument("--teleop-button", default="leftGrip", help="Hold this Quest input to enable teleop.")
     parser.add_argument("--close-axis", default="leftTrig", help="Analog Quest input used for open/close.")
-    parser.add_argument("--pickup-mode-button", default="Y", help="Press this button to enter pickup/pinch mode.")
+    parser.add_argument("--pickup-mode-button", default="Y", help="Press this button to toggle pickup/pinch mode.")
     parser.add_argument("--button-threshold", type=float, default=0.15)
     parser.add_argument("--pressure-threshold", type=float, default=10)
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
-    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.75)
+    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.5)
     parser.add_argument("--trigger-deadband", type=float, default=0.03)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--closed-position", default="", help="10 comma-separated 0..255 joint values.")

@@ -17,7 +17,7 @@ class L10CanHand:
     - left hand uses CAN ID 0x28, right hand uses 0x27
     - position commands are split across 0x04 (joints 7..10) and 0x01 (joints 1..6)
     - five-finger normal force arrives on 0x20
-    - tactile summary pressure can arrive on 0xb1..0xb5
+    - three tactile pressure sensors per finger can arrive on 0xb1..0xb5
     """
 
     HAND_IDS = {"left": 0x28, "right": 0x27}
@@ -32,6 +32,7 @@ class L10CanHand:
     HAND_TANGENTIAL_FORCE = 0x21
     HAND_TANGENTIAL_FORCE_DIR = 0x22
     HAND_APPROACH_INC = 0x23
+    TOUCH_SENSOR_COUNT_PER_FINGER = 3
 
     def __init__(
         self,
@@ -60,7 +61,7 @@ class L10CanHand:
         self._tangential_force = [0.0] * 5
         self._tangential_force_dir = [255.0] * 5
         self._approach_inc = [0.0] * 5
-        self._touch_pressure = [-1.0] * 5
+        self._touch_pressure = [[-1.0] * self.TOUCH_SENSOR_COUNT_PER_FINGER for _ in range(5)]
         self._last_command = [255] * 10
 
         self.bus = self._open_bus()
@@ -137,13 +138,20 @@ class L10CanHand:
             self.send_frame(frame, [], sleep_s=0.001)
 
     def get_finger_pressures(self) -> List[float]:
-        """Return one pressure number per finger: thumb, index, middle, ring, little."""
+        """Return one pressure number per finger, using the max of all sensors on that finger."""
         with self._lock:
             pressures = []
-            for normal, touch in zip(self._normal_force, self._touch_pressure):
-                candidates = [value for value in (normal, touch) if value is not None and value >= 0]
+            for normal, touch_sensors in zip(self._normal_force, self._touch_pressure):
+                candidates = [normal]
+                candidates.extend(touch_sensors)
+                candidates = [value for value in candidates if value is not None and value >= 0]
                 pressures.append(max(candidates) if candidates else 0.0)
             return pressures
+
+    def get_touch_pressures(self) -> List[float]:
+        """Return all 15 tactile pressure sensors, ordered thumb..little, proximal..distal."""
+        with self._lock:
+            return [value for finger_sensors in self._touch_pressure for value in finger_sensors]
 
     def request_joint_status(self):
         self.send_frame(self.JOINT_POSITION_RCO, [], sleep_s=0.001)
@@ -194,7 +202,10 @@ class L10CanHand:
                 self._approach_inc = [float(value) for value in response_data[:5]]
             elif 0xB1 <= frame_type <= 0xB5 and len(response_data) >= 2:
                 finger_index = frame_type - 0xB1
-                self._touch_pressure[finger_index] = float(response_data[1])
+                sensor_values = response_data[1 : 1 + self.TOUCH_SENSOR_COUNT_PER_FINGER]
+                if len(sensor_values) < self.TOUCH_SENSOR_COUNT_PER_FINGER:
+                    sensor_values.extend([-1.0] * (self.TOUCH_SENSOR_COUNT_PER_FINGER - len(sensor_values)))
+                self._touch_pressure[finger_index] = [float(value) for value in sensor_values]
 
     def shutdown(self):
         self.running = False
