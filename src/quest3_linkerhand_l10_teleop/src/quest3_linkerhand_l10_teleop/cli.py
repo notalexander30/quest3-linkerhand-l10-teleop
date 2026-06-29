@@ -246,7 +246,7 @@ def build_parser():
     parser.add_argument("--close-axis", default="leftTrig", help="Analog Quest input used for open/close.")
     parser.add_argument("--pickup-mode-button", default="Y", help="Hold this button for pickup/pinch mode.")
     parser.add_argument("--button-threshold", type=float, default=0.15)
-    parser.add_argument("--pressure-threshold", type=float, default=180.0)
+    parser.add_argument("--pressure-threshold", type=float, default=10)
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
