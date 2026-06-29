@@ -23,12 +23,16 @@ class FakeHand:
     def __init__(self):
         self.commands = []
         self.joint_status_requested = False
+        self.touch_pressures = [0.0] * 15
 
     def request_pressure(self):
         pass
 
     def get_finger_pressures(self):
         return [0.0] * 5
+
+    def get_touch_pressures(self):
+        return list(self.touch_pressures)
 
     def get_joint_status(self, wait_s=0.01):
         self.joint_status_requested = True
@@ -117,6 +121,16 @@ class CliTest(unittest.TestCase):
         self.assertEqual(teleop.current_pose[0], 120.0)
         self.assertTrue(teleop.frozen_fingers[0])
         self.assertFalse(teleop.hand.joint_status_requested)
+
+    def test_flat_touch_sensor_15_freezes_little_finger(self):
+        teleop = self.make_teleop({})
+        teleop.hand.touch_pressures[14] = 20.0
+
+        teleop.poll_pressures_if_due()
+        teleop.apply_pressure_freeze()
+
+        self.assertEqual(len(teleop.latest_pressures), 15)
+        self.assertEqual(teleop.frozen_fingers, [False, False, False, False, True])
 
 
 if __name__ == "__main__":

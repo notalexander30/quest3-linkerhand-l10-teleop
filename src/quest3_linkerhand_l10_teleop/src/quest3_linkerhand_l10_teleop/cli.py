@@ -11,6 +11,7 @@ from .l10_can import L10CanHand, default_socketcan_interface
 from .oculus_reader import OculusReader
 from .teleop_core import (
     FINGER_NAMES,
+    PRESSURE_SENSOR_FINGERS,
     build_joint_steps,
     button_is_pressed,
     button_value,
@@ -72,7 +73,7 @@ class Quest3L10Teleop:
         self.last_close_amount = 0.0
         self.last_mode = "normal"
         self.last_sent = None
-        self.latest_pressures = [0.0] * 5
+        self.latest_pressures = [0.0] * len(PRESSURE_SENSOR_FINGERS)
         self.last_force_poll = 0.0
         self.last_waiting_log = 0.0
         self.running = True
@@ -218,27 +219,34 @@ class Quest3L10Teleop:
         if now - self.last_force_poll < min_period:
             return
         self.hand.request_pressure()
-        self.latest_pressures = self.hand.get_finger_pressures()
+        self.latest_pressures = self.hand.get_touch_pressures()
         self.last_force_poll = now
-        logging.debug("L10 finger pressures: %s", self.latest_pressures)
+        logging.debug("L10 touch pressures: %s", self.latest_pressures)
 
     def apply_pressure_freeze(self):
         crossing = [
             index
             for index, pressure in enumerate(self.latest_pressures)
-            if not self.frozen_fingers[index] and pressure >= self.args.pressure_threshold
+            if (
+                index < len(PRESSURE_SENSOR_FINGERS)
+                and not self.frozen_fingers[PRESSURE_SENSOR_FINGERS[index]]
+                and pressure >= self.args.pressure_threshold
+            )
         ]
         next_pose, next_frozen = freeze_fingers_from_pressure(
             self.current_pose,
             self.frozen_fingers,
             self.latest_pressures,
             self.args.pressure_threshold,
+            pressure_sensor_fingers=PRESSURE_SENSOR_FINGERS,
         )
-        for index in crossing:
+        for sensor_index in crossing:
+            finger_index = PRESSURE_SENSOR_FINGERS[sensor_index]
             logging.info(
-                "Freezing %s at pressure %.1f >= %.1f",
-                FINGER_NAMES[index],
-                self.latest_pressures[index],
+                "Freezing %s from touch sensor %d at pressure %.1f >= %.1f",
+                FINGER_NAMES[finger_index],
+                sensor_index + 1,
+                self.latest_pressures[sensor_index],
                 self.args.pressure_threshold,
             )
         self.current_pose = next_pose

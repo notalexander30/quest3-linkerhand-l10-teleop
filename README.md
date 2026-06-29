@@ -11,7 +11,7 @@ Use the left Quest controller:
 - Squeeze the left index/top trigger, `leftTrig`, to close the hand proportionally.
 - Release `leftTrig` to open the hand proportionally.
 - Press `Y` once to enter pickup/pinch mode. Press `Y` again to return to normal bend-only mode.
-- Pressure sensing still runs while closing. Matrix touch data is aggregated into 15 tactile zones, 3 per finger, using the same pressure threshold. When any zone on a finger reaches it, that finger freezes while the other fingers keep moving.
+- Pressure sensing still runs while closing. Matrix touch data is exposed as a flat 15-sensor list using the same pressure threshold. When any sensor on a finger reaches it, that finger freezes while the other fingers keep moving.
 - Thumb pitch joint index `0` moves at 75% of the normal software step speed by default. In pickup mode, squeezing `leftTrig` closes the pitch joints while keeping side/abduction joints fixed.
 
 Default poses:
@@ -22,6 +22,14 @@ Default poses:
 - Pickup/pinch close pose: `0,0,0,0,0,0,255,255,255,255`
 
 The close poses avoid side/rotation motions by keeping those joints at `255`.
+
+Pressure sensor order:
+
+- `1..3`: thumb
+- `4..6`: index
+- `7..9`: middle
+- `10..12`: ring
+- `13..15`: little
 
 The left L10 CAN ID is `0x28`. Right hand mode is available with `--hand-type right`, using CAN ID `0x27`.
 

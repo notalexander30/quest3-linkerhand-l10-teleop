@@ -3,6 +3,7 @@ from typing import Dict, Iterable, List, Sequence
 
 FINGER_NAMES = ["thumb", "index", "middle", "ring", "little"]
 THUMB_PITCH_JOINT_INDEX = 0
+PRESSURE_SENSOR_FINGERS = [0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 4]
 FINGER_JOINTS = [
     [0, 1, 9],
     [2, 6],
@@ -94,15 +95,20 @@ def freeze_fingers_from_pressure(
     frozen_fingers: Sequence[bool],
     pressures: Iterable[float],
     pressure_threshold: float,
+    pressure_sensor_fingers: Sequence[int] = None,
     measured_position: Sequence[float] = None,
 ):
     next_position = list(float(value) for value in current)
     next_frozen = list(bool(value) for value in frozen_fingers)
     measured_position = measured_position if measured_position and len(measured_position) == 10 else None
+    pressure_sensor_fingers = pressure_sensor_fingers or range(len(FINGER_JOINTS))
 
-    for finger_index, pressure in enumerate(pressures):
-        if finger_index >= len(FINGER_JOINTS):
+    for sensor_index, pressure in enumerate(pressures):
+        if sensor_index >= len(pressure_sensor_fingers):
             break
+        finger_index = int(pressure_sensor_fingers[sensor_index])
+        if finger_index >= len(FINGER_JOINTS):
+            continue
         if next_frozen[finger_index] or float(pressure) < float(pressure_threshold):
             continue
         next_frozen[finger_index] = True

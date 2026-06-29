@@ -1,6 +1,7 @@
 import unittest
 
 from quest3_linkerhand_l10_teleop.teleop_core import (
+    PRESSURE_SENSOR_FINGERS,
     build_joint_steps,
     button_is_pressed,
     button_value,
@@ -39,6 +40,23 @@ class TeleopCoreTest(unittest.TestCase):
         self.assertEqual(next_pose[2], 120)
         self.assertEqual(next_pose[6], 255)
         self.assertEqual(next_pose[3], 255)
+
+    def test_freezes_finger_from_flat_15_sensor_pressure_list(self):
+        current = [255] * 10
+        frozen = [False] * 5
+        pressures = [0] * 15
+        pressures[4] = 190
+
+        next_pose, next_frozen = freeze_fingers_from_pressure(
+            current,
+            frozen,
+            pressures,
+            pressure_threshold=180,
+            pressure_sensor_fingers=PRESSURE_SENSOR_FINGERS,
+        )
+
+        self.assertEqual(next_frozen, [False, True, False, False, False])
+        self.assertEqual(next_pose, [255.0] * 10)
 
     def test_move_pose_respects_frozen_finger(self):
         current = [255] * 10
