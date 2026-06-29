@@ -2,6 +2,7 @@ from typing import Dict, Iterable, List, Sequence
 
 
 FINGER_NAMES = ["thumb", "index", "middle", "ring", "little"]
+THUMB_PITCH_JOINT_INDEX = 1
 FINGER_JOINTS = [
     [0, 1, 9],
     [2, 6],
@@ -46,11 +47,31 @@ def move_scalar_toward(current: float, target: float, step: float) -> float:
     return current - step
 
 
+def build_joint_steps(
+    step_per_cycle: float,
+    joint_count: int = 10,
+    thumb_pitch_joint_index: int = THUMB_PITCH_JOINT_INDEX,
+    thumb_pitch_scale: float = 0.8,
+) -> List[float]:
+    steps = [float(step_per_cycle)] * int(joint_count)
+    if 0 <= int(thumb_pitch_joint_index) < len(steps):
+        steps[int(thumb_pitch_joint_index)] *= max(0.0, float(thumb_pitch_scale))
+    return steps
+
+
+def joint_step(step, joint_index: int) -> float:
+    if isinstance(step, (tuple, list)):
+        if joint_index < len(step):
+            return float(step[joint_index])
+        return float(step[-1]) if step else 0.0
+    return float(step)
+
+
 def move_pose_toward(
     current: Sequence[float],
     target: Sequence[float],
     frozen_fingers: Sequence[bool],
-    step: float,
+    step,
 ) -> List[float]:
     frozen_joints = set()
     for frozen, joints in zip(frozen_fingers, FINGER_JOINTS):
@@ -62,7 +83,9 @@ def move_pose_toward(
         if index in frozen_joints:
             next_pose.append(float(current_value))
         else:
-            next_pose.append(move_scalar_toward(float(current_value), float(target_value), float(step)))
+            next_pose.append(
+                move_scalar_toward(float(current_value), float(target_value), joint_step(step, index))
+            )
     return next_pose
 
 

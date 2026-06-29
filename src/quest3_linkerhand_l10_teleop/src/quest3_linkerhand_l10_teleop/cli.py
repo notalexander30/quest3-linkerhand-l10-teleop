@@ -11,6 +11,7 @@ from .l10_can import L10CanHand, default_socketcan_interface
 from .oculus_reader import OculusReader
 from .teleop_core import (
     FINGER_NAMES,
+    build_joint_steps,
     button_is_pressed,
     button_value,
     freeze_fingers_from_pressure,
@@ -22,7 +23,8 @@ from .teleop_core import (
 
 DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 DEFAULT_CLOSED = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
-DEFAULT_PICKUP = [0, 255, 0, 80, 255, 255, 255, 255, 255, 255]
+DEFAULT_PICKUP_OPEN = [255, 0, 255, 255, 255, 255, 255, 255, 255, 255]
+DEFAULT_PICKUP = list(DEFAULT_CLOSED)
 
 
 def parse_byte_list(raw: Optional[str], expected_lengths: Iterable[int], name: str) -> Optional[List[int]]:
@@ -52,8 +54,23 @@ class Quest3L10Teleop:
 
         self.open_pose = parse_pose(args.open_position, DEFAULT_OPEN, "--open-position")
         self.closed_pose = parse_pose(args.closed_position, DEFAULT_CLOSED, "--closed-position")
+        self.pickup_open_pose = parse_pose(
+            args.pickup_open_position,
+            DEFAULT_PICKUP_OPEN,
+            "--pickup-open-position",
+        )
         self.pickup_pose = parse_pose(args.pickup_position, DEFAULT_PICKUP, "--pickup-position")
         self.current_pose = list(self.open_pose)
+        self.normal_joint_steps = build_joint_steps(
+            args.step_per_cycle,
+            thumb_pitch_scale=args.thumb_pitch_speed_scale,
+        )
+        self.pickup_joint_steps = build_joint_steps(
+            args.step_per_cycle,
+            thumb_pitch_scale=args.pickup_thumb_pitch_speed_scale,
+        )
+        self.pickup_mode_until = 0.0
+        self.prev_pickup_button_pressed = False
         self.frozen_fingers = [False] * 5
         self.prev_enabled = False
         self.last_close_amount = 0.0
@@ -80,8 +97,9 @@ class Quest3L10Teleop:
             self.args.close_axis,
         )
         logging.info(
-            "Hold %s for pickup mode; release it for normal bend-only grip mode.",
+            "Press %s to enter pickup mode for %.1f seconds.",
             self.args.pickup_mode_button,
+            self.args.pickup_mode_duration_s,
         )
 
         self.hand = L10CanHand(
@@ -144,9 +162,23 @@ class Quest3L10Teleop:
                 self.last_waiting_log = now
             return
 
+        now = time.monotonic()
         enabled = button_is_pressed(buttons, self.args.teleop_button, self.args.button_threshold)
         close_amount = button_value(buttons, self.args.close_axis)
-        pickup_mode = button_is_pressed(buttons, self.args.pickup_mode_button, self.args.button_threshold)
+        pickup_button_pressed = button_is_pressed(
+            buttons,
+            self.args.pickup_mode_button,
+            self.args.button_threshold,
+        )
+        if pickup_button_pressed and not self.prev_pickup_button_pressed:
+            self.pickup_mode_until = now + max(0.0, self.args.pickup_mode_duration_s)
+            logging.info(
+                "Pickup grip mode selected for %.1f seconds.",
+                self.args.pickup_mode_duration_s,
+            )
+        self.prev_pickup_button_pressed = pickup_button_pressed
+
+        pickup_mode = now < self.pickup_mode_until
         mode = "pickup" if pickup_mode else "normal"
 
         if not enabled:
@@ -174,14 +206,16 @@ class Quest3L10Teleop:
             self.poll_pressures_if_due()
             self.apply_pressure_freeze()
 
+        open_pose = self.pickup_open_pose if pickup_mode else self.open_pose
         close_pose = self.pickup_pose if pickup_mode else self.closed_pose
-        target = interpolate_pose(self.open_pose, close_pose, close_amount)
+        joint_steps = self.pickup_joint_steps if pickup_mode else self.normal_joint_steps
+        target = interpolate_pose(open_pose, close_pose, close_amount)
 
         self.current_pose = move_pose_toward(
             self.current_pose,
             target,
             self.frozen_fingers,
-            self.args.step_per_cycle,
+            joint_steps,
         )
         self.last_close_amount = close_amount
         self.send_if_changed(self.current_pose)
@@ -244,15 +278,19 @@ def build_parser():
     parser.add_argument("--apk-path", default="", help="Path to teleop-debug.apk if not already installed.")
     parser.add_argument("--teleop-button", default="leftGrip", help="Hold this Quest input to enable teleop.")
     parser.add_argument("--close-axis", default="leftTrig", help="Analog Quest input used for open/close.")
-    parser.add_argument("--pickup-mode-button", default="Y", help="Hold this button for pickup/pinch mode.")
+    parser.add_argument("--pickup-mode-button", default="Y", help="Press this button to enter pickup/pinch mode.")
     parser.add_argument("--button-threshold", type=float, default=0.15)
     parser.add_argument("--pressure-threshold", type=float, default=10)
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
+    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.8)
+    parser.add_argument("--pickup-thumb-pitch-speed-scale", type=float, default=1.0)
+    parser.add_argument("--pickup-mode-duration-s", type=float, default=1.0)
     parser.add_argument("--trigger-deadband", type=float, default=0.03)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--closed-position", default="", help="10 comma-separated 0..255 joint values.")
+    parser.add_argument("--pickup-open-position", default="", help="10 comma-separated pickup open joint values.")
     parser.add_argument("--pickup-position", default="", help="10 comma-separated pickup/pinch joint values.")
     parser.add_argument("--speed", default="", help="Optional 5 or 10 comma-separated speed values.")
     parser.add_argument("--torque", default="", help="Optional 5 or 10 comma-separated torque values.")

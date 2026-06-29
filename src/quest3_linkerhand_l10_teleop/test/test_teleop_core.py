@@ -1,6 +1,7 @@
 import unittest
 
 from quest3_linkerhand_l10_teleop.teleop_core import (
+    build_joint_steps,
     button_is_pressed,
     button_value,
     freeze_fingers_from_pressure,
@@ -46,6 +47,16 @@ class TeleopCoreTest(unittest.TestCase):
         self.assertEqual(moved[2], 255)
         self.assertEqual(moved[6], 255)
         self.assertEqual(moved[3], 247)
+
+    def test_thumb_pitch_step_can_be_eighty_percent_speed(self):
+        current = [255] * 10
+        target = [0] * 10
+        steps = build_joint_steps(8)
+        moved = move_pose_toward(current, target, [False] * 5, step=steps)
+
+        self.assertEqual(moved[0], 247)
+        self.assertAlmostEqual(moved[1], 248.6)
+        self.assertEqual(moved[2], 247)
 
     def test_interpolate_pose_uses_trigger_amount(self):
         open_pose = [255] * 10

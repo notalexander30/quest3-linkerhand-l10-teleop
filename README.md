@@ -10,14 +10,16 @@ Use the left Quest controller:
 - Release `leftGrip` to stop sending new hand commands.
 - Squeeze the left index/top trigger, `leftTrig`, to close the hand proportionally.
 - Release `leftTrig` to open the hand proportionally.
-- Hold `Y` while squeezing `leftTrig` to use pickup/pinch mode.
+- Press `Y` once to enter pickup/pinch mode for 1 second, then it automatically returns to normal bend-only mode.
 - Pressure sensing still runs while closing. When one finger reaches the pressure threshold, that finger freezes while the other fingers keep moving.
+- In normal mode, thumb pitch joint index `1` moves at 80% of the normal software step speed by default.
 
 Default poses:
 
 - Open pose: `255,255,255,255,255,255,255,255,255,255`
 - Normal close pose: `0,255,0,0,0,0,255,255,255,255`
-- Pickup/pinch close pose: `0,255,0,80,255,255,255,255,255,255`
+- Pickup/pinch open pose: `255,0,255,255,255,255,255,255,255,255`
+- Pickup/pinch close pose: `0,255,0,0,0,0,255,255,255,255`
 
 The close poses avoid side/rotation motions by keeping those joints at `255`.
 
@@ -109,7 +111,7 @@ Expected startup output:
 ```text
 Starting Quest3 -> left LinkerHand L10 teleop on can0
 Hold leftGrip to enable teleop; use leftTrig as the analog open/close trigger.
-Hold Y for pickup mode; release it for normal bend-only grip mode.
+Press Y to enter pickup mode for 1.0 seconds.
 Sent startup open pose: [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 ```
 
@@ -184,6 +186,18 @@ Use a different analog close trigger:
 quest3-l10-teleop --can-channel can0 --close-axis rightTrig
 ```
 
+Use a different pickup mode button:
+
+```bash
+quest3-l10-teleop --can-channel can0 --pickup-mode-button X
+```
+
+Change how long pickup mode stays active after pressing the pickup button:
+
+```bash
+quest3-l10-teleop --can-channel can0 --pickup-mode-duration-s 1.0
+```
+
 Override poses:
 
 ```bash
@@ -191,7 +205,8 @@ quest3-l10-teleop \
   --can-channel can0 \
   --open-position 255,255,255,255,255,255,255,255,255,255 \
   --closed-position 0,255,0,0,0,0,255,255,255,255 \
-  --pickup-position 0,255,0,80,255,255,255,255,255,255
+  --pickup-open-position 255,0,255,255,255,255,255,255,255,255 \
+  --pickup-position 0,255,0,0,0,0,255,255,255,255
 ```
 
 Optional speed/torque:
@@ -199,6 +214,8 @@ Optional speed/torque:
 ```bash
 quest3-l10-teleop --can-channel can0 --speed 120,120,120,120,120
 quest3-l10-teleop --can-channel can0 --torque 180,180,180,180,180
+quest3-l10-teleop --can-channel can0 --thumb-pitch-speed-scale 0.8
+quest3-l10-teleop --can-channel can0 --pickup-thumb-pitch-speed-scale 1.0
 ```
 
 Disable startup open command:
