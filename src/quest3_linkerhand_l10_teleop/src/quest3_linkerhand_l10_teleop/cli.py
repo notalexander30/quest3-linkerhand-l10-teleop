@@ -23,8 +23,8 @@ from .teleop_core import (
 
 DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 DEFAULT_CLOSED = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
-DEFAULT_PICKUP_OPEN = list(DEFAULT_OPEN)
-DEFAULT_PICKUP = list(DEFAULT_CLOSED)
+DEFAULT_PICKUP_OPEN = [255, 0, 255, 255, 255, 255, 255, 255, 255, 255]
+DEFAULT_PICKUP = [0, 0, 255, 255, 255, 255, 255, 255, 255, 255]
 
 
 def parse_byte_list(raw: Optional[str], expected_lengths: Iterable[int], name: str) -> Optional[List[int]]:
@@ -228,13 +228,11 @@ class Quest3L10Teleop:
             for index, pressure in enumerate(self.latest_pressures)
             if not self.frozen_fingers[index] and pressure >= self.args.pressure_threshold
         ]
-        measured = self.hand.get_joint_status(wait_s=0.01) if crossing else None
         next_pose, next_frozen = freeze_fingers_from_pressure(
             self.current_pose,
             self.frozen_fingers,
             self.latest_pressures,
             self.args.pressure_threshold,
-            measured_position=measured,
         )
         for index in crossing:
             logging.info(
@@ -250,6 +248,10 @@ class Quest3L10Teleop:
         command = pose_to_bytes(pose)
         if command == self.last_sent:
             return
+        if self.last_sent and self.args.pose_deadband > 0:
+            max_delta = max(abs(next_value - last_value) for next_value, last_value in zip(command, self.last_sent))
+            if max_delta < self.args.pose_deadband:
+                return
         self.hand.set_joint_positions(command)
         self.last_sent = command
 
@@ -278,6 +280,7 @@ def build_parser():
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
     parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.5)
     parser.add_argument("--trigger-deadband", type=float, default=0.03)
+    parser.add_argument("--pose-deadband", type=float, default=2.0)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--closed-position", default="", help="10 comma-separated 0..255 joint values.")
     parser.add_argument("--pickup-open-position", default="", help="10 comma-separated pickup open joint values.")

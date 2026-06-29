@@ -22,6 +22,7 @@ class FakeReader:
 class FakeHand:
     def __init__(self):
         self.commands = []
+        self.joint_status_requested = False
 
     def request_pressure(self):
         pass
@@ -30,6 +31,7 @@ class FakeHand:
         return [0.0] * 5
 
     def get_joint_status(self, wait_s=0.01):
+        self.joint_status_requested = True
         return None
 
     def set_joint_positions(self, command):
@@ -71,7 +73,9 @@ class CliTest(unittest.TestCase):
 
         self.assertEqual(args.pickup_mode_button, "Y")
         self.assertEqual(args.thumb_pitch_speed_scale, 0.5)
-        self.assertEqual(teleop.pickup_open_pose[1], 255)
+        self.assertEqual(args.pose_deadband, 2.0)
+        self.assertEqual(teleop.pickup_open_pose, [255.0, 0.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0])
+        self.assertEqual(teleop.pickup_pose, [0.0, 0.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0])
         self.assertAlmostEqual(teleop.joint_steps[0], 4.0)
         self.assertAlmostEqual(teleop.joint_steps[1], 8.0)
 
@@ -92,6 +96,27 @@ class CliTest(unittest.TestCase):
         teleop.step()
         self.assertEqual(teleop.last_mode, "normal")
         self.assertFalse(teleop.pickup_mode_enabled)
+
+    def test_pose_deadband_skips_tiny_command_changes(self):
+        teleop = self.make_teleop({})
+        teleop.last_sent = [100] * 10
+
+        teleop.send_if_changed([101] * 10)
+        self.assertEqual(teleop.hand.commands, [])
+
+        teleop.send_if_changed([103] * 10)
+        self.assertEqual(teleop.hand.commands, [[103] * 10])
+
+    def test_pressure_freeze_keeps_current_commanded_pose(self):
+        teleop = self.make_teleop({})
+        teleop.current_pose = [120.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0]
+        teleop.latest_pressures = [20.0, 0.0, 0.0, 0.0, 0.0]
+
+        teleop.apply_pressure_freeze()
+
+        self.assertEqual(teleop.current_pose[0], 120.0)
+        self.assertTrue(teleop.frozen_fingers[0])
+        self.assertFalse(teleop.hand.joint_status_requested)
 
 
 if __name__ == "__main__":

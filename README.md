@@ -11,15 +11,15 @@ Use the left Quest controller:
 - Squeeze the left index/top trigger, `leftTrig`, to close the hand proportionally.
 - Release `leftTrig` to open the hand proportionally.
 - Press `Y` once to enter pickup/pinch mode. Press `Y` again to return to normal bend-only mode.
-- Pressure sensing still runs while closing. All 15 tactile pressure sensors use the same pressure threshold; when any sensor on a finger reaches it, that finger freezes while the other fingers keep moving.
-- Thumb pitch joint index `0` moves at 50% of the normal software step speed by default. Thumb abduction joint index `1` is not moved by the pickup open pose.
+- Pressure sensing still runs while closing. Matrix touch data is aggregated into 15 tactile zones, 3 per finger, using the same pressure threshold. When any zone on a finger reaches it, that finger freezes while the other fingers keep moving.
+- Thumb pitch joint index `0` moves at 50% of the normal software step speed by default. In pickup mode, squeezing `leftTrig` only closes thumb pitch; thumb abduction joint index `1` stays fixed between the pickup open and pickup close poses.
 
 Default poses:
 
 - Open pose: `255,255,255,255,255,255,255,255,255,255`
 - Normal close pose: `0,255,0,0,0,0,255,255,255,255`
-- Pickup/pinch open pose: `255,255,255,255,255,255,255,255,255,255`
-- Pickup/pinch close pose: `0,255,0,0,0,0,255,255,255,255`
+- Pickup/pinch open pose: `255,0,255,255,255,255,255,255,255,255`
+- Pickup/pinch close pose: `0,0,255,255,255,255,255,255,255,255`
 
 The close poses avoid side/rotation motions by keeping those joints at `255`.
 
@@ -199,8 +199,8 @@ quest3-l10-teleop \
   --can-channel can0 \
   --open-position 255,255,255,255,255,255,255,255,255,255 \
   --closed-position 0,255,0,0,0,0,255,255,255,255 \
-  --pickup-open-position 255,255,255,255,255,255,255,255,255,255 \
-  --pickup-position 0,255,0,0,0,0,255,255,255,255
+  --pickup-open-position 255,0,255,255,255,255,255,255,255,255 \
+  --pickup-position 0,0,255,255,255,255,255,255,255,255
 ```
 
 Optional speed/torque:
@@ -209,6 +209,7 @@ Optional speed/torque:
 quest3-l10-teleop --can-channel can0 --speed 120,120,120,120,120
 quest3-l10-teleop --can-channel can0 --torque 180,180,180,180,180
 quest3-l10-teleop --can-channel can0 --thumb-pitch-speed-scale 0.5
+quest3-l10-teleop --can-channel can0 --pose-deadband 2
 ```
 
 Disable startup open command:
