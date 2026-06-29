@@ -184,6 +184,7 @@ class L10CanHand:
         matrix = self._touch_matrix[finger_index]
         flat_matrix = [value for row in matrix for value in row if value >= 0]
         if flat_matrix:
+            # LinkerHand's SDK stores each finger's matrix touch response as 12 rows x 6 columns.
             zones = []
             rows_per_zone = self.MATRIX_ROWS // self.TOUCH_ZONES_PER_FINGER
             for zone_index in range(self.TOUCH_ZONES_PER_FINGER):

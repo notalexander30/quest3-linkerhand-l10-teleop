@@ -24,7 +24,7 @@ from .teleop_core import (
 DEFAULT_OPEN = [255, 255, 255, 255, 255, 255, 255, 255, 255, 255]
 DEFAULT_CLOSED = [0, 255, 0, 0, 0, 0, 255, 255, 255, 255]
 DEFAULT_PICKUP_OPEN = [255, 0, 255, 255, 255, 255, 255, 255, 255, 255]
-DEFAULT_PICKUP = [0, 0, 255, 255, 255, 255, 255, 255, 255, 255]
+DEFAULT_PICKUP = [0, 0, 0, 0, 0, 0, 255, 255, 255, 255]
 
 
 def parse_byte_list(raw: Optional[str], expected_lengths: Iterable[int], name: str) -> Optional[List[int]]:
@@ -278,7 +278,7 @@ def build_parser():
     parser.add_argument("--command-rate-hz", type=float, default=30.0)
     parser.add_argument("--force-poll-hz", type=float, default=25.0)
     parser.add_argument("--step-per-cycle", type=float, default=8.0)
-    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.5)
+    parser.add_argument("--thumb-pitch-speed-scale", type=float, default=0.75)
     parser.add_argument("--trigger-deadband", type=float, default=0.03)
     parser.add_argument("--pose-deadband", type=float, default=2.0)
     parser.add_argument("--open-position", default="", help="10 comma-separated 0..255 joint values.")

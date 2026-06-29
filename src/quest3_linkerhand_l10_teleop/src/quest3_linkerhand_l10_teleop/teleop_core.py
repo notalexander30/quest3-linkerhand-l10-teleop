@@ -51,7 +51,7 @@ def build_joint_steps(
     step_per_cycle: float,
     joint_count: int = 10,
     thumb_pitch_joint_index: int = THUMB_PITCH_JOINT_INDEX,
-    thumb_pitch_scale: float = 0.5,
+    thumb_pitch_scale: float = 0.75,
 ) -> List[float]:
     steps = [float(step_per_cycle)] * int(joint_count)
     if 0 <= int(thumb_pitch_joint_index) < len(steps):

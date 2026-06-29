@@ -72,11 +72,11 @@ class CliTest(unittest.TestCase):
         teleop = self.make_teleop({})
 
         self.assertEqual(args.pickup_mode_button, "Y")
-        self.assertEqual(args.thumb_pitch_speed_scale, 0.5)
+        self.assertEqual(args.thumb_pitch_speed_scale, 0.75)
         self.assertEqual(args.pose_deadband, 2.0)
         self.assertEqual(teleop.pickup_open_pose, [255.0, 0.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0])
-        self.assertEqual(teleop.pickup_pose, [0.0, 0.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0, 255.0])
-        self.assertAlmostEqual(teleop.joint_steps[0], 4.0)
+        self.assertEqual(teleop.pickup_pose, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 255.0, 255.0, 255.0, 255.0])
+        self.assertAlmostEqual(teleop.joint_steps[0], 6.0)
         self.assertAlmostEqual(teleop.joint_steps[1], 8.0)
 
     def test_pickup_mode_toggles_until_y_pressed_again(self):
